@@ -20,11 +20,12 @@ and write one figure each to `figures/`.
 3. [Repository layout](#repository-layout)
 4. [Reproducing the manuscript figures](#reproducing-the-manuscript-figures)
 5. [Example outputs](#example-outputs)
-5. [Programmatic use](#programmatic-use)
-6. [Running on real benchmarks](#running-on-real-benchmarks)
-7. [Implementation notes and design choices](#implementation-notes-and-design-choices)
-8. [Citation](#citation)
-9. [License](#license)
+6. [Programmatic use](#programmatic-use)
+7. [Datasets and third-party data](#datasets-and-third-party-data)
+8. [Running on real benchmarks](#running-on-real-benchmarks)
+9. [Implementation notes and design choices](#implementation-notes-and-design-choices)
+10. [Citation](#citation)
+11. [License](#license)
 
 ---
 
@@ -286,6 +287,50 @@ include keys `teacher_img`, `teacher_aud`, `teacher_mm`, `hkpas`,
 `car`, `psi`, `last_routing_weights`, `teacher_specs`, `kernel_sizes`,
 plus `s1_history`, `s2_history`, `s3_history` dictionaries with
 per-epoch loss curves.
+
+## Datasets and third-party data
+
+This repository ships only a small synthetic dataset (see
+`tsr_distill/dataset.py`) so that the pipeline is runnable without any
+download. The quantitative results reported in the paper use five
+publicly available third-party benchmarks, listed below with their
+original sources. None of them are redistributed here; please obtain
+each from its official location and follow its individual license.
+
+- **AV-MNIST** — synthetic audio–visual digit classification (10
+  classes). Assembled by pairing MNIST handwritten digits with spoken
+  digits (FSDD/TIDigits) and ESC-50 background noise, following
+  Pérez-Rúa et al. (MFAS, CVPR 2019). Pre-extracted spectrograms are
+  commonly obtained via the MultiBench distribution
+  (https://github.com/pliang279/MultiBench). Component datasets:
+  MNIST (http://yann.lecun.com/exdb/mnist/), Free Spoken Digit Dataset
+  (https://github.com/Jakobovski/free-spoken-digit-dataset), ESC-50
+  (https://github.com/karolpiczak/ESC-50).
+
+- **RAVDESS** — Ryerson Audio-Visual Database of Emotional Speech and
+  Song (8 emotion classes), Livingstone & Russo, *PLoS ONE* 2018.
+  Official release on Zenodo, DOI 10.5281/zenodo.1188976
+  (https://zenodo.org/record/1188976). License: CC BY-NC-SA 4.0.
+
+- **VGGSound-50k** — a stratified 50k-clip subset we sample from
+  VGGSound (Chen et al., ICASSP 2020). Original dataset:
+  https://www.robots.ox.ac.uk/~vgg/data/vggsound/ and
+  https://github.com/hche11/VGGSound (CC BY 4.0). Our subset-selection
+  script / clip index is released at: `<add your Zenodo/HF link here>`.
+
+- **CrisisMMD-V2** — multimodal (image + text) crisis tweets, version
+  2.0, Alam et al., ICWSM 2018. Official page:
+  https://crisisnlp.qcri.org/crisismmd (also mirrored at
+  https://huggingface.co/datasets/QCRI/CrisisMMD).
+
+- **NYU-Depth-V2** — RGB-D indoor semantic segmentation (40-class
+  task), Silberman et al., ECCV 2012. Official page:
+  https://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html . The
+  40-class label mapping follows Gupta et al., CVPR 2013.
+
+The same source information is also stated in the Materials & Methods
+section of the manuscript. Replace the VGGSound-50k placeholder above
+with your public subset link once it is uploaded.
 
 ## Running on real benchmarks
 
