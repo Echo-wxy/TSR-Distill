@@ -18,7 +18,8 @@ and write one figure each to `figures/`.
 1. [What this repository contains](#what-this-repository-contains)
 2. [Quick start](#quick-start)
 3. [Repository layout](#repository-layout)
-4. [Example outputs](#example-outputs)
+4. [Reproducing the manuscript figures](#reproducing-the-manuscript-figures)
+5. [Example outputs](#example-outputs)
 5. [Programmatic use](#programmatic-use)
 6. [Running on real benchmarks](#running-on-real-benchmarks)
 7. [Implementation notes and design choices](#implementation-notes-and-design-choices)
@@ -101,13 +102,34 @@ TSR-Distill/
 │   ├── 04_stage_ablation.py      # +S1 / +S1+S2 / Full bar chart
 │   ├── 05_tsne_features.py       # t-SNE + silhouette comparison
 │   ├── 06_loss_sensitivity.py    # robustness to alpha, beta, eta
-│   └── 07_hierarchy_levels.py    # sensitivity to L_h in {1, 2, 3, 4}
+│   ├── 07_hierarchy_levels.py    # sensitivity to L_h in {1, 2, 3, 4}
+│   └── make_paper_figures.py     # publication-quality Fig. 2/3/4 for the
+│                                 #   manuscript (300 dpi, PDF + TIFF); same
+│                                 #   computation as scripts 01/02/03
 ├── figures/                      # populated by running the scripts
 ├── run_all.py                    # batch-run every script
 ├── requirements.txt
 ├── LICENSE
 └── README.md
 ```
+
+## Reproducing the manuscript figures
+
+Figures 2, 3, and 4 in the manuscript are the publication-quality
+counterparts of the diagnostics produced by `01_cta_alignment.py`,
+`02_hkpa_gating.py`, and `03_car_routing.py`. To regenerate them:
+
+```bash
+python scripts/make_paper_figures.py        # all three
+python scripts/make_paper_figures.py 2      # only Figure 2, etc.
+```
+
+This writes `figures/Figure2.{pdf,tiff}`, `Figure3.{pdf,tiff}`, and
+`Figure4.{pdf,tiff}` at 300 dpi. The script reuses the exact
+computation (models, seeds, training loops) of scripts 01/02/03 and
+changes only the rendering — 300 dpi vector output, Times-family fonts,
+no in-figure titles, top-mounted legends, and (a)–(e) panel tags — so
+the repository output matches the figures in the paper.
 
 ## Example outputs
 
