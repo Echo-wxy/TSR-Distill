@@ -1,9 +1,10 @@
 # TSR-Distill
 
-**Domain-Specific Cross-Modal Distillation via Temporal, Structural,
-and Intrinsic-Aware Knowledge Transfer**
+**Temporal, Structural, and Routed Distillation (TSR-Distill):
+Domain-Specific Cross-Modal Knowledge Transfer**
 
-Reference implementation accompanying the IEEE Access manuscript.
+Reference implementation accompanying the *PeerJ Computer Science*
+manuscript.
 The repository ships every architectural component described in the
 paper (CTA / ICC losses, HKPA adapter, Context-Aware Router) together
 with a lightweight synthetic image–audio dataset that makes the entire
@@ -298,14 +299,12 @@ original sources. None of them are redistributed here; please obtain
 each from its official location and follow its individual license.
 
 - **AV-MNIST** — synthetic audio–visual digit classification (10
-  classes). Assembled by pairing MNIST handwritten digits with spoken
-  digits (FSDD/TIDigits) and ESC-50 background noise, following
-  Pérez-Rúa et al. (MFAS, CVPR 2019). Pre-extracted spectrograms are
-  commonly obtained via the MultiBench distribution
-  (https://github.com/pliang279/MultiBench). Component datasets:
-  MNIST (http://yann.lecun.com/exdb/mnist/), Free Spoken Digit Dataset
-  (https://github.com/Jakobovski/free-spoken-digit-dataset), ESC-50
-  (https://github.com/karolpiczak/ESC-50).
+  classes), originally introduced by Vielzeuf et al. (CentralNet,
+  ECCV Workshops 2018). We reconstructed it from its publicly
+  available constituent sources: MNIST
+  (http://yann.lecun.com/exdb/mnist/), the Free Spoken Digit Dataset
+  (https://github.com/Jakobovski/free-spoken-digit-dataset), and
+  ESC-50 (https://github.com/karolpiczak/ESC-50).
 
 - **RAVDESS** — Ryerson Audio-Visual Database of Emotional Speech and
   Song (8 emotion classes), Livingstone & Russo, *PLoS ONE* 2018.
@@ -316,7 +315,7 @@ each from its official location and follow its individual license.
   VGGSound (Chen et al., ICASSP 2020). Original dataset:
   https://www.robots.ox.ac.uk/~vgg/data/vggsound/ and
   https://github.com/hche11/VGGSound (CC BY 4.0). Our subset-selection
-  script / clip index is released at: `<add your Zenodo/HF link here>`.
+  script / clip index is released at: https://doi.org/10.5281/zenodo.21349671.
 
 - **CrisisMMD-V2** — multimodal (image + text) crisis tweets, version
   2.0, Alam et al., ICWSM 2018. Official page:
@@ -328,9 +327,8 @@ each from its official location and follow its individual license.
   https://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html . The
   40-class label mapping follows Gupta et al., CVPR 2013.
 
-The same source information is also stated in the Materials & Methods
-section of the manuscript. Replace the VGGSound-50k placeholder above
-with your public subset link once it is uploaded.
+The same source information is also stated in the Materials and
+Methods and Data Availability sections of the manuscript.
 
 ## Running on real benchmarks
 
@@ -395,12 +393,12 @@ If you use this code, please cite the original paper:
 ```bibtex
 @article{zhang2026tsrdistill,
   author  = {Zhang, Sibo and Yuan, Zichen and Chen, Kaijie},
-  title   = {{TSR-Distill}: Domain-Specific Cross-Modal Distillation
-             via Temporal, Structural, and Intrinsic-Aware Knowledge
+  title   = {Temporal, Structural, and Routed Distillation
+             ({TSR-Distill}): Domain-Specific Cross-Modal Knowledge
              Transfer},
-  journal = {IEEE Access},
+  journal = {PeerJ Computer Science},
   year    = {2026},
-  doi     = {10.1109/ACCESS.2026.0000000}
+  note    = {Under review}
 }
 ```
 
