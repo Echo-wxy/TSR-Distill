@@ -314,8 +314,12 @@ each from its official location and follow its individual license.
 - **VGGSound-50k** — a stratified 50k-clip subset we sample from
   VGGSound (Chen et al., ICASSP 2020). Original dataset:
   https://www.robots.ox.ac.uk/~vgg/data/vggsound/ and
-  https://github.com/hche11/VGGSound (CC BY 4.0). Our subset-selection
-  script / clip index is released at: https://doi.org/10.5281/zenodo.21349671.
+  https://github.com/hche11/VGGSound (CC BY 4.0). The subset is
+  constructed from the official release by stratified uniform
+  sampling within each retained class to approximately one-fourth of
+  the original per-class counts, preserving the official train/test
+  split assignments; the full protocol is described in the Materials
+  and Methods section of the manuscript.
 
 - **CrisisMMD-V2** — multimodal (image + text) crisis tweets, version
   2.0, Alam et al., ICWSM 2018. Official page:
