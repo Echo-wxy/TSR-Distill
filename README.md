@@ -1,411 +1,337 @@
-# TSR-Distill
+# DG-VDT
 
-**Temporal, Structural, and Routed Distillation (TSR-Distill):
-Domain-Specific Cross-Modal Knowledge Transfer**
+**DG-VDT: Dynamic Graph-Guided Reinforcement Learning for Low-Latency Vulnerability Detection and Attack Traceability in Ethereum Smart Contracts**
 
-Reference implementation accompanying the *PeerJ Computer Science*
-manuscript.
-The repository ships every architectural component described in the
-paper (CTA / ICC losses, HKPA adapter, Context-Aware Router) together
-with a lightweight synthetic image–audio dataset that makes the entire
-three-stage training pipeline reproducible in minutes on a single CPU
-core. Eight standalone scripts inspect specific framework behaviours
-and write one figure each to `figures/`.
+This repository contains the **reference implementation of the DG-VDT reward engine** — the graph schema, the RGCN graph encoder Φ, the canonical reference attack signatures $G^*$, and the complete dual-stage reward computation — together with a self-contained unit-test suite. It accompanies the manuscript currently under review at *Applied Sciences* (MDPI).
+
+This code repository is archived on Zenodo (**DOI: [10.5281/zenodo.20848392](https://doi.org/10.5281/zenodo.20848392)**). The **author-constructed datasets, pre-trained model weights, and full GRPO training / evaluation pipeline are not yet publicly deposited**: they are available to the journal's editors and reviewers upon request during the evaluation period, and will be released publicly under CC BY 4.0 upon acceptance of the manuscript; see [Dataset Information](#dataset-information) below.
 
 ---
 
-## Table of contents
+## Description
 
-1. [What this repository contains](#what-this-repository-contains)
-2. [Quick start](#quick-start)
-3. [Repository layout](#repository-layout)
-4. [Reproducing the manuscript figures](#reproducing-the-manuscript-figures)
-5. [Example outputs](#example-outputs)
-6. [Programmatic use](#programmatic-use)
-7. [Datasets and third-party data](#datasets-and-third-party-data)
-8. [Running on real benchmarks](#running-on-real-benchmarks)
-9. [Implementation notes and design choices](#implementation-notes-and-design-choices)
-10. [Citation](#citation)
-11. [License](#license)
+DG-VDT reformulates Ethereum smart-contract vulnerability detection and attacker traceability as joint reasoning over a heterogeneous multi-graph abstraction of EVM execution traces. Each trace is decomposed into three complementary graphs (Fund Flow, Contract Creation, Contract Call), and a policy network is trained by pure reinforcement learning (Group Relative Policy Optimization) under a dual-stage progressive reward: an embedding-similarity signal that promotes broad structural exploration transitions, through a sigmoid curriculum, to VF2 subgraph-isomorphism verification for exact signature matching. No supervised fine-tuning is used.
+
+The framework is scoped to three structurally distinct vulnerability categories: **reentrancy**, **short-address**, and **timestamp-dependence**.
 
 ---
 
-## What this repository contains
+## Dataset Information
 
-- A clean, fully-typed Python implementation of every algorithm in the
-  paper:
-  - Stage 1: **Temporal-Intrinsic Collaborative Bootstrapping**
-    (`cta_loss`, `icc_loss` — Eq. 1–5).
-  - Stage 2: **Hierarchical Knowledge Projection Adaptation**
-    (`HKPA`, `feature_regression_loss`, `domain_aware_loss` — Eq. 6–9).
-  - Stage 3: **Context-Aware Hierarchical Routed Distillation**
-    (`ContextAwareRouter`, `hierarchical_kd_loss`, `load_balancing_loss`
-    — Eq. 10–15).
-- A `train_tsr_distill(...)` entry point that runs the full three-stage
-  pipeline end-to-end with sensible defaults, plus parallel baselines
-  (`train_unimodal_baseline`, `train_kd_baseline`) for comparison.
-- A synthetic image–audio classification dataset designed to make the
-  multimodal teacher genuinely outperform either unimodal teacher: the
-  class label is factorised as `c = i_img * K_aud + i_aud`, so a model
-  that only sees the image can at best identify `i_img` (a 5-way subset
-  for the default 10-class setting) and a model that only sees the audio
-  can at best identify `i_aud`. Single-modality students are therefore
-  bounded around 50% while the fusion teacher reaches >95%, providing a
-  meaningful gap for cross-modal distillation to close.
-- Eight figure-generating scripts under `scripts/` that each verify one
-  specific framework claim.
+All datasets used in this study are released or referenced with an explicit **DOI or persistent URL** and are distributed in **human- and machine-readable formats** (JSON / JSONL / CSV / `.sol` source files), so that reviewers, replicators, and downstream researchers can access every data source directly from the tables below.
 
-## Quick start
+### 1. Author-constructed datasets (released with this repository)
+
+The six author-constructed datasets below are **not yet publicly deposited**. They are available to the journal's editors and reviewers upon request during the evaluation period, and will be released under CC BY 4.0 upon acceptance. (Zenodo DOI [10.5281/zenodo.20848392](https://doi.org/10.5281/zenodo.20848392) archives this **code repository**, not the datasets.)
+
+| Dataset | Size | Description | DOI / URL | Format | License |
+|---|---|---|---|---|---|
+| **BlockTrace-500k** | 500,000 traces | Ethereum mainnet execution traces (blocks 15,000,000–19,500,000, July 2022 – March 2024); used for GRPO training | Upon acceptance (on request during review) | JSONL | CC BY 4.0 |
+| **EthVulBench** | 4,500 transactions | Curated evaluation set across three vulnerability categories (reentrancy 1,800; short-address 1,350; timestamp-dependence 1,350) | Upon acceptance (on request during review) | JSON + CSV | CC BY 4.0 |
+| **Etherscan-Public-1k** | 1,024 contracts | Independent validation set from the Etherscan verified-contracts registry (Feb 2024 snapshot) | Upon acceptance (on request during review) | `.sol` + JSON | CC BY 4.0 |
+| **ToolGen-Block** | 2,500 instances | Blockchain-specific function-calling benchmark following the BFCL annotation schema | Upon acceptance (on request during review) | JSONL | CC BY 4.0 |
+| **ScamTrace-2024** | 1,200 traces | Real-world attack traces with ground-truth exploiter addresses (sourced from DeFiHackLabs) | Upon acceptance (on request during review) | JSONL | CC BY 4.0 |
+| **CrossChainAtt** | 600 scenarios | Cross-chain bridge attack scenarios (Ronin, Nomad, Wormhole) | Upon acceptance (on request during review) | JSON | CC BY 4.0 |
+
+### 2. Third-party datasets (used for zero-shot evaluation, NOT redistributed)
+
+All third-party datasets are accessed through their **original public repositories**; only the persistent source URLs are given here so that reviewers can obtain the exact versions used in this study. No third-party data is redistributed with this repository.
+
+| Dataset | Description | DOI / URL (main text) | Format | Original license |
+|---|---|---|---|---|
+| **SolidiFI-Bench** | Injected-bug Solidity benchmark for detector evaluation | <https://github.com/DependableSystemsLab/SolidiFI-benchmark> | `.sol` + JSON (bug reports) | MIT |
+| **SmartBugs Curated** | 143 hand-curated vulnerable Solidity contracts across 10 DASP categories | <https://github.com/smartbugs/smartbugs-curated> | `.sol` + YAML metadata | MIT |
+| **SmartBugs Wild** | ~47k real-world Solidity contracts scraped from Etherscan | <https://github.com/smartbugs/smartbugs-wild> | `.sol` | MIT |
+
+### 3. Additional public data sources referenced in the study
+
+The following resources are cited in the manuscript as **reference specifications, APIs, or evidence sources**. They are not used as training or evaluation data; the URLs are provided here for full traceability.
+
+| Resource | Role in the study | URL | Format |
+|---|---|---|---|
+| BFCL annotation schema | Reference schema for the `ToolGen-Block` annotation format | <https://gorilla.cs.berkeley.edu/leaderboard.html> | HTML / JSON |
+| Etherscan API | Source for verified contract source code and transaction traces | <https://docs.etherscan.io/> | JSON (REST API) |
+| SWC Registry | Canonical taxonomy of smart-contract weaknesses used to align vulnerability labels | <https://swcregistry.io/> | HTML / Markdown |
+| DeFiHackLabs | Reproduced real-world exploits used as ground truth for `ScamTrace-2024` | <https://github.com/SunWeb3Sec/DeFiHackLabs> | `.sol` + Markdown |
+| Ronin post-mortem | Attack narrative used to construct one `CrossChainAtt` scenario | <https://roninchain.com/blog/posts/back-to-building-ronin-security-breach-6513cc78a5edc1001b03c364> | HTML |
+| Nomad analysis | Attack narrative used to construct one `CrossChainAtt` scenario | <https://medium.com/immunefi/hack-analysis-nomad-bridge-august-2022-5aa63d53814a> | HTML |
+| Wormhole analysis | Attack narrative used to construct one `CrossChainAtt` scenario | <https://www.halborn.com/blog/post/explained-the-wormhole-hack-february-2022> | HTML |
+
+---
+
+## Code Information
+
+This repository is the **reward-engine reference implementation**. Layout:
+
+```
+dgvdt/
+├── schema.py       # trace-graph data structure: node/edge taxonomy, the three
+│                   #   graph views (FFG / CCG / CaG), PyG & networkx converters
+├── encoder.py      # RGCN graph encoder Φ (2 layers, hidden dim 256, five edge
+│                   #   relation types: ETH / CALL / CREATE / SLOAD / SSTORE)
+│                   #   + the InfoNCE graph-contrastive pre-training loss
+├── references.py   # canonical reference signatures G* (RE 7n/8e, SA 5n/5e,
+│                   #   TD 6n/7e) + the median-size G* construction procedure
+└── reward.py       # the complete reward: format gate (incl. the benign "none"
+                    #   verdict), Stage-1 cosine reward (Eq. 2), Stage-2 VF2
+                    #   verification, sigmoid curriculum (k=0.3, m=8k steps),
+                    #   multi-graph collaboration bonus (anomaly co-occurrence
+                    #   detectors per view), parameter penalty, and composition
+dgvdt_tests.py      # deterministic unit tests for every reward component
+requirements.txt    # minimal dependencies for this package
+```
+
+The **GRPO training loop** (group size $N=8$, PPO-style clipping $\varepsilon=0.2$), the **EVM graph-extraction pipeline**, the **evaluation scripts**, and the reproducibility artefacts (per-instance McNemar tests, bootstrap confidence intervals for macro-F1, Holm–Bonferroni correction, seed control) belong to the full experimental pipeline, which is **not yet publicly released**: it is available to editors and reviewers upon request and will be released alongside the datasets and pre-trained weights upon acceptance.
+
+---
+
+## Requirements
+
+**This repository** (reward engine; matches `requirements.txt`):
+
+- Python 3.10+
+- torch >= 2.0 (CPU is sufficient for the reward engine and tests)
+- torch_geometric >= 2.4 (RGCN encoder)
+- networkx >= 3.0 (VF2 subgraph isomorphism)
+- pytest (optional, for running the test suite via pytest)
+
+**Full training / evaluation pipeline** (released upon acceptance): additionally
+transformers 4.40+, statsmodels 0.14 (McNemar test, Holm–Bonferroni correction), scipy and numpy (bootstrap confidence intervals),
+datasets, accelerate, and PyTorch with CUDA 12.1.
+
+**Hardware used in the paper**
+
+- Training: 4×A100-80GB (DG-VDT-7B, ~48 GPU-hours); 8×A100-80GB (DG-VDT-32B, ~180 GPU-hours)
+- Inference: single NVIDIA RTX 3090 (24 GB VRAM)
+
+---
+
+## Usage Instructions
+
+**1. Install and verify** (this repository):
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/<your-user>/TSR-Distill.git
-cd TSR-Distill
 pip install -r requirements.txt
-
-# 2. Run the fastest end-to-end demonstration (~2 minutes on CPU)
-python scripts/00_quickstart.py
-#   -> figures/00_quickstart.png
-
-# 3. Run any individual diagnostic (each writes one figure to ./figures/)
-python scripts/01_cta_alignment.py
-python scripts/02_hkpa_gating.py
-python scripts/03_car_routing.py
-python scripts/04_stage_ablation.py
-python scripts/05_tsne_features.py
-python scripts/06_loss_sensitivity.py
-python scripts/07_hierarchy_levels.py
-
-# 4. Or generate every figure in one go (~20-30 minutes on CPU)
-python run_all.py
+python dgvdt_tests.py            # or: python -m pytest dgvdt_tests.py -q
 ```
 
-No external dataset downloads are required. All eight scripts run on
-the in-process synthetic dataset described in `tsr_distill/dataset.py`.
+All tests are deterministic and run on CPU in seconds.
 
-## Repository layout
-
-```
-TSR-Distill/
-├── tsr_distill/                  # the framework package
-│   ├── __init__.py               # public API
-│   ├── dataset.py                # synthetic factorised image-audio dataset
-│   ├── models.py                 # ImageEncoder, AudioEncoder,
-│   │                             #   MultimodalTeacher, HKPA,
-│   │                             #   ContextAwareRouter, phi() helpers
-│   ├── losses.py                 # Eq. 1-9, 14, plus KD baseline loss
-│   └── trainer.py                # full 3-stage pipeline + baselines
-├── scripts/                      # each script runs standalone and
-│   │                             #   produces one PNG in figures/
-│   ├── 00_quickstart.py          # baseline vs KD vs TSR-Distill
-│   ├── 01_cta_alignment.py      # cross-modal temporal alignment matrix
-│   ├── 02_hkpa_gating.py         # multi-scale gating of HKPA
-│   ├── 03_car_routing.py         # CAR per-sample weights + diagnostic
-│   ├── 04_stage_ablation.py      # +S1 / +S1+S2 / Full bar chart
-│   ├── 05_tsne_features.py       # t-SNE + silhouette comparison
-│   ├── 06_loss_sensitivity.py    # robustness to alpha, beta, eta
-│   ├── 07_hierarchy_levels.py    # sensitivity to L_h in {1, 2, 3, 4}
-│   └── make_paper_figures.py     # publication-quality Fig. 2/3/4 for the
-│                                 #   manuscript (300 dpi, PDF + TIFF); same
-│                                 #   computation as scripts 01/02/03
-├── figures/                      # populated by running the scripts
-├── run_all.py                    # batch-run every script
-├── requirements.txt
-├── LICENSE
-└── README.md
-```
-
-## Reproducing the manuscript figures
-
-Figures 2, 3, and 4 in the manuscript are the publication-quality
-counterparts of the diagnostics produced by `01_cta_alignment.py`,
-`02_hkpa_gating.py`, and `03_car_routing.py`. To regenerate them:
-
-```bash
-python scripts/make_paper_figures.py        # all three
-python scripts/make_paper_figures.py 2      # only Figure 2, etc.
-```
-
-This writes `figures/Figure2.{pdf,tiff}`, `Figure3.{pdf,tiff}`, and
-`Figure4.{pdf,tiff}` at 300 dpi. The script reuses the exact
-computation (models, seeds, training loops) of scripts 01/02/03 and
-changes only the rendering — 300 dpi vector output, Times-family fonts,
-no in-figure titles, top-mounted legends, and (a)–(e) panel tags — so
-the repository output matches the figures in the paper.
-
-## Example outputs
-
-All figures below are produced by running the corresponding script on
-the lightweight synthetic dataset shipped with the repository. The
-exact numbers vary by ±2% across seeds (a property of the small
-synthetic dataset, not of TSR-Distill itself); the trends are stable.
-
-### 00 — Quickstart: baseline vs KD vs TSR-Distill
-
-`python scripts/00_quickstart.py`
-
-![quickstart](figures/00_quickstart.png)
-
-Final validation accuracies on one representative run:
-
-| method | val accuracy | gap recovered |
-|--------|-------------:|--------------:|
-| no-KD baseline | 0.473 | (anchor) |
-| response-based KD | 0.500 | +7.0% |
-| **TSR-Distill (Ours)** | **0.535** | **+16.0%** |
-| MM teacher (upper bound) | 0.863 | 100% |
-
-TSR-Distill recovers roughly twice as much of the teacher–student gap
-as logit-only KD on this dataset.
-
-### 01 — Cross-modal temporal alignment
-
-`python scripts/01_cta_alignment.py`
-
-![cta](figures/01_cta_alignment.png)
-
-The mean row entropy of the soft-alignment matrix `S` drops from
-**2.07** (random init, diffuse) to **0.23** (after 8 Stage 1 epochs,
-peaked). This confirms that minimising `l_CTA` produces confident
-many-to-one cross-modal correspondences without requiring bijective
-alignment (Section III-A of the paper).
-
-### 02 — HKPA multi-scale gating
-
-`python scripts/02_hkpa_gating.py`
-
-![hkpa](figures/02_hkpa_gating.png)
-
-A controlled experiment confirms HKPA's adaptive gating: when the
-class-discriminative signal lives at a coarse temporal scale (a slow
-sinusoid buried in fast noise), the gates correctly migrate from the
-initial uniform `[1/3, 1/3, 1/3]` to **`[0.26, 0.30, 0.44]`** — the
-large-kernel branch is up-weighted because it captures the slow signal,
-while the small-kernel branch is down-weighted because it sees mostly
-noise.
-
-### 03 — Context-Aware Router
-
-`python scripts/03_car_routing.py`
-
-![car-main](figures/03_car_routing.png)
-
-The full Stage 3 routing analysis on the synthetic validation set,
-showing per-sample weights, per-class means, teacher utilisation, and
-the σ disagreement vector.
-
-`python scripts/03_car_routing.py` additionally writes a diagnostic
-plot that isolates input-conditioning:
-
-![car-diagnostic](figures/03b_car_routing_diagnostic.png)
-
-In the diagnostic, a fresh router is trained on synthetic two-mode
-data with controlled φ patterns. CAR perfectly recovers the input-
-dependent routing: **mode A → [0.45, 0.35, 0.10, 0.10]**,
-**mode B → [0.10, 0.10, 0.35, 0.45]**.
-
-### 04 — Stage ablation
-
-`python scripts/04_stage_ablation.py`
-
-![ablation](figures/04_stage_ablation.png)
-
-Incremental contribution of each stage, mean over 2 seeds. The full
-S1+S2+S3 pipeline ranks first.
-
-### 05 — t-SNE feature visualisation
-
-`python scripts/05_tsne_features.py`
-
-![tsne](figures/05_tsne_features.png)
-
-Pooled student features projected to 2D. TSR-Distill produces visibly
-cleaner macro-cluster structure (top-left, right, bottom-right are
-distinct factorised-label groups), and obtains the best silhouette
-score across the three configurations.
-
-### 06 — Loss coefficient sensitivity
-
-`python scripts/06_loss_sensitivity.py`
-
-![sensitivity](figures/06_loss_sensitivity.png)
-
-A 0.1× / 1× / 10× sweep of each of the three primary loss coefficients
-(α, β, η). The framework is essentially insensitive to α and β within
-this range. The HKD weight η is the only coefficient whose extreme
-setting (10× default) causes a visible accuracy drop, which matches the
-paper's argument that mid-range η is the regime worth tuning.
-
-### 07 — HKPA hierarchy levels
-
-`python scripts/07_hierarchy_levels.py`
-
-![lh](figures/07_hierarchy_levels.png)
-
-Accuracy across `L_h ∈ {1, 2, 3, 4}` kernel-set configurations. Adding
-hierarchical levels helps monotonically on the synthetic data; the
-paper picks `L_h = 3` because it remained the most stable choice across
-five real benchmarks (AV-MNIST, RAVDESS, VGGSound-50k, CrisisMMD-V2,
-NYU-Depth-V2). Reviewers wishing to verify the saturation point should
-re-run this script on a real benchmark via the dataset adapter
-instructions below.
-
-## Programmatic use
-
-Beyond the figure-generating scripts, the package can be used as a
-library:
+**2. Use the reward engine** — score a model output against an observed trace graph:
 
 ```python
-import torch
-from tsr_distill import make_loaders, train_tsr_distill
+from dgvdt import (TraceGraph, Node, Edge, RGCNEncoder,
+                   canonical_references, compute_reward, RewardConfig)
 
-torch.manual_seed(0)
-train_loader, val_loader, _, _ = make_loaders(
-    batch_size=64, train_samples=1024, val_samples=256
+# build (or parse) an observed snapshot G_obs = {FFG, CCG, CaG}
+g_obs = TraceGraph(
+    nodes=[Node("0xAttacker", "EOA"), Node("0xVictim", "Contract")],
+    edges=[Edge("0xAttacker", "0xVictim", "ETH", attrs={"amount": 1.0})],
 )
 
-result = train_tsr_distill(
-    train_loader,
-    val_loader,
-    target_modality="image",        # or "audio"
-    epochs_s1=12,                   # Stage 1 budget
-    epochs_s2=2,                    # Stage 2 budget
-    epochs_s3=8,                    # Stage 3 budget
-    alpha=0.5, beta=1.0,            # S1 loss weights
-    gamma=0.2,                      # S2 domain-aware weight
-    eta=1.0, zeta=1.0, mu=2.0,      # S3 weights (HKD, RKD, load-balance)
-    device="cpu",                   # or "cuda"
-    verbose=True,
-)
+encoder = RGCNEncoder()                  # load pre-trained Φ weights in practice
+refs = canonical_references()            # the three signatures G*
+out = "<vulnerability>reentrancy</vulnerability> <trace>0x" + "ab" * 20 + "</trace>"
 
-print("final val acc:", result["final_val_acc"])
-student_state_dict = result["student"].state_dict()
+rb = compute_reward(out, g_obs, step=20000, encoder=encoder, references=refs,
+                    cfg=RewardConfig())  # paper defaults: k=0.3, m=8k steps
+print(rb)                                # full reward breakdown
 ```
 
-To inspect internal training state (HKPAs, CAR, per-stage losses, last
-routing weights), pass `return_internals=True`; the returned dict will
-include keys `teacher_img`, `teacher_aud`, `teacher_mm`, `hkpas`,
-`car`, `psi`, `last_routing_weights`, `teacher_specs`, `kernel_sizes`,
-plus `s1_history`, `s2_history`, `s3_history` dictionaries with
-per-epoch loss curves.
+A benign verdict is `"<vulnerability>none</vulnerability>"` with **no** `<trace>` tag; it receives the format reward only (no reference signature exists for the benign class).
 
-## Datasets and third-party data
+**3. Reproduce the paper's training and evaluation** — the datasets, the pre-trained Φ and policy weights, the GRPO training pipeline, and the per-benchmark evaluation scripts are **not yet publicly released**; they are available to editors and reviewers upon request during the evaluation period and will be released publicly upon acceptance. (The Zenodo DOI <https://doi.org/10.5281/zenodo.20848392> archives this code repository.)
 
-This repository ships only a small synthetic dataset (see
-`tsr_distill/dataset.py`) so that the pipeline is runnable without any
-download. The quantitative results reported in the paper use five
-publicly available third-party benchmarks, listed below with their
-original sources. None of them are redistributed here; please obtain
-each from its official location and follow its individual license.
+Reference-graph specifications $G^*$ for the three vulnerability categories (node/edge counts, adjacency lists, node-feature vectors) are fully defined in code in `dgvdt/references.py`.
 
-- **AV-MNIST** — synthetic audio–visual digit classification (10
-  classes), originally introduced by Vielzeuf et al. (CentralNet,
-  ECCV Workshops 2018). We reconstructed it from its publicly
-  available constituent sources: MNIST
-  (http://yann.lecun.com/exdb/mnist/), the Free Spoken Digit Dataset
-  (https://github.com/Jakobovski/free-spoken-digit-dataset), and
-  ESC-50 (https://github.com/karolpiczak/ESC-50).
+---
 
-- **RAVDESS** — Ryerson Audio-Visual Database of Emotional Speech and
-  Song (8 emotion classes), Livingstone & Russo, *PLoS ONE* 2018.
-  Official release on Zenodo, DOI 10.5281/zenodo.1188976
-  (https://zenodo.org/record/1188976). License: CC BY-NC-SA 4.0.
+## Methodology
 
-- **VGGSound-50k** — a stratified 50k-clip subset we sample from
-  VGGSound (Chen et al., ICASSP 2020). Original dataset:
-  https://www.robots.ox.ac.uk/~vgg/data/vggsound/ and
-  https://github.com/hche11/VGGSound (CC BY 4.0). The subset is
-  constructed from the official release by stratified uniform
-  sampling within each retained class to approximately one-fourth of
-  the original per-class counts, preserving the official train/test
-  split assignments; the full protocol is described in the Materials
-  and Methods section of the manuscript.
+The methodological details below (Sections 1–9) are the technical description of DG-VDT. For the full empirical evaluation, statistical analyses, and ablations, please refer to the accompanying manuscript.
 
-- **CrisisMMD-V2** — multimodal (image + text) crisis tweets, version
-  2.0, Alam et al., ICWSM 2018. Official page:
-  https://crisisnlp.qcri.org/crisismmd (also mirrored at
-  https://huggingface.co/datasets/QCRI/CrisisMMD).
+### 1. Problem and Motivation
 
-- **NYU-Depth-V2** — RGB-D indoor semantic segmentation (40-class
-  task), Silberman et al., ECCV 2012. Official page:
-  https://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html . The
-  40-class label mapping follows Gupta et al., CVPR 2013.
+Two things are simultaneously hard on Ethereum: **detecting vulnerabilities precisely** and **tracing attackers reliably**. The two dominant existing lines each have a structural weakness:
 
-The same source information is also stated in the Materials and
-Methods and Data Availability sections of the manuscript.
+- **Tool-augmented LLMs**: trained by supervised fine-tuning (SFT) to imitate large corpora of detection trajectories. They do well *within* the training distribution, but their learning is essentially imitation of surface statistical patterns rather than the causal structure of attacks, so they degrade sharply on structurally novel exploits (new reentrancy variants, cross-chain bridge attacks, etc.).
+- **Reward-signal-based RL**: rewards are typically defined over "was the tool call correct / is the output format valid", which lacks any structural understanding of inter-contract interaction topology.
 
-## Running on real benchmarks
+A characteristic failure mode: an SFT model treats the *cyclic fund-flow* topology as the signature of malicious activity, so it achieves high recall on cyclic reentrancy samples but collapses on **timestamp-dependence** attacks whose traces have no cyclic value-transfer structure. The discriminative signal (block-number / timestamp comparisons) is right there in the trace, but the model cannot see it because it over-relies on superficial topology.
 
-The synthetic dataset in `tsr_distill/dataset.py` is intentionally
-toy — it exists so that reviewers can verify every component
-end-to-end without downloading anything. To run the framework on a
-real benchmark (AV-MNIST, RAVDESS, VGGSound-50k, CrisisMMD-V2,
-NYU-Depth-V2), write a `torch.utils.data.Dataset` whose `__getitem__`
-returns the triple `(image_tensor, audio_tensor, int_label)` and pass
-its `DataLoader` to `train_tsr_distill(...)`. No other change is
-required; the model dimensions are inferred from the first batch.
+**Central thesis**: relational graph structure encodes far richer semantics than tool-invocation counts or output formats; and a **progressive curriculum** is needed to reconcile the breadth-versus-precision tension inherent in open-domain security detection.
 
-For NYU-Depth-V2 segmentation, treat depth as the second "modality"
-and replace the classification head with a per-pixel decoder; the
-remainder of the pipeline carries over with `target_modality` set to
-the modality you want the student to consume at inference.
+### 2. Overview
 
-## Implementation notes and design choices
+DG-VDT reformulates "vulnerability detection + attacker traceability" as **joint reasoning over a heterogeneous multi-graph abstraction of execution traces**, driven by a **graph-structured reward** under pure RL (no SFT pretraining). Three interlocking design decisions:
 
-A handful of choices in the reference code differ from a one-to-one
-transcription of the paper equations. They are documented here for
-transparency:
+1. **An EVM-instrumented multi-graph representation** — decompose on-chain activity into three semantically complementary graphs;
+2. **A dual-stage progressive graph-guided reward** — broad exploration early, strict matching late, with a smooth sigmoid curriculum between them;
+3. **A GRPO policy optimizer** — train an LLM backbone with Group Relative Policy Optimization.
 
-- **Three-teacher ensemble.** The paper specifies `N = M_eff × L_attach`
-  specialised teachers. For the lightweight demonstration we use
-  `M_eff = 3` source teachers and `L_attach ∈ {1, 2}`, yielding
-  `N = 4` specialised teachers. The number is small enough to keep
-  routing visualisations interpretable; it can be raised by extending
-  the `teacher_specs` list in `trainer.py`.
-- **Warm-start of the Stage 3 student.** We pre-train a small student
-  with response-based KD against the multimodal teacher and use that
-  snapshot as the Stage 3 initialisation. The paper trains Stage 3 from
-  scratch but uses larger datasets and far more epochs; on the small
-  synthetic dataset the warm-start is needed for the HKD/RKD signals
-  to refine rather than fight cold-start optimisation.
-- **Logit-level term `l_RKD`.** Stage 3 in the paper applies the routed
-  signal at the feature level (Eq. 14). In addition, our implementation
-  applies the same `w^j` weights to a logit-level KD term computed from
-  a small head on each `Z_tilde^j`. This mirrors what MST-Distill does
-  and what the paper implicitly relies on by including `l_task` in
-  Stage 3; it is a faithful operational extension rather than a new
-  ingredient.
-- **Load-balancing weight μ.** The paper uses `μ = 0.01`. In our small-
-  batch, short-epoch setting that value lets the router collapse to a
-  single teacher. We default to `μ = 2.0` in `train_tsr_distill` and
-  the result is a routing distribution with both a global preference
-  structure and per-sample variation (see `figures/03_car_routing.png`).
-- **CAR softmax temperature.** We expose `temperature` on
-  `ContextAwareRouter` (default 2.0) for the same reason: it keeps the
-  routing distribution soft enough for joint optimisation with the
-  student. Setting it to 1.0 recovers the paper's exact formulation.
+It targets three structurally distinct vulnerability classes: **reentrancy**, **short-address**, and **timestamp-dependence**.
 
-These deviations are pragmatic adjustments for a CPU-friendly synthetic
-demonstration. On larger datasets with longer training horizons the
-paper's hyperparameter values are recommended; they are exposed as
-keyword arguments of `train_tsr_distill`.
+### 3. Multi-Graph Representation: One Trace into Three Graphs
+
+Each EVM execution trace is decomposed into three directed graphs that model complementary dimensions of blockchain interaction:
+
+| Graph | Symbol | Captured semantics | Edge meaning |
+|---|---|---|---|
+| Fund Flow Graph | **FFG** $G_f$ | economic topology of a transaction | Ether transfers between addresses (amount, direction) |
+| Contract Creation Graph | **CCG** $G_c$ | contract deployment provenance | deployer -> deployed contract |
+| Contract Call Graph | **CaG** $G_\text{call}$ | cross-contract function calls (opcode granularity) | call order, invocation type |
+
+The three are aggregated into a unified snapshot $G_\text{obs} = \{G_f, G_c, G_\text{call}\}$.
+
+**Node types** (address taxonomy + auxiliary trace nodes): EOA (externally owned account), Contract, Miner (block producer), plus auxiliary nodes for state / opcode / branch / transfer-sink.
+**Edge types** (interaction ontology): `ETH` (Ether transfer), `CALL` (opcode-level invocation), `CREATE` (deployment), `SLOAD` / `SSTORE` (storage access).
+
+This multi-graph abstraction simultaneously exposes economic topology, deployment provenance, and opcode-level call semantics — exactly what per-contract or single-graph methods leave inaccessible.
+
+### 4. Reference Attack Signatures $G^*$
+
+Each vulnerability class is associated with a canonical **reference graph** $G^*$ that captures its minimal discriminating structure. The structural specifications:
+
+- **Reentrancy $G^*_\text{RE}$ (7 nodes / 8 edges)**: an attacker EOA, a victim contract, an attacker proxy contract, plus balance-ledger state nodes. The discriminating core is the **fund cycle in the FFG** (proxy -> victim -> proxy) together with the **corresponding CALL re-entry edge in the CaG**.
+- **Short-address $G^*_\text{SA}$ (5 nodes / 5 edges)**: an attacker EOA, a victim ERC-20 contract, a short recipient address, plus ABI-decoder state nodes. The discriminating core is a CALL edge in the CaG whose **ABI-encoded argument length is < 32 bytes** — the RGCN encoder maps this truncated argument length to an embedding distinct from a valid 32-byte transfer.
+- **Timestamp-dependence $G^*_\text{TD}$ (6 nodes / 7 edges)**: a miner account (a high out-degree hub in the CCG), a lottery contract, a TIMESTAMP opcode node, a conditional branch node, a transfer sink, and a balance state node. The discriminating core is the **`TIMESTAMP -> TRANSFER` causal chain in the CaG**, co-occurring with the **miner-account hub in the CCG**.
+
+Signatures are selected by a **median-size** strategy: from the pool of confirmed-positive graphs of a class, take the connected graph whose node count is the median. Compared with min / max / mean size, the median is more robust to outliers in the size distribution — the minimum graph *under-constrains* (insufficient discriminative power), the maximum graph *over-constrains* (rare but valid attack variants fail to match), and the median sits at the optimum between the two.
+
+### 5. Graph-Guided Reward Mechanism
+
+The overall training signal decomposes as:
+
+$$R_\text{final} = R_\text{format} + R_\text{graph}$$
+
+where $R_\text{format} \in \{0,1\}$ is a **prerequisite gate** that checks whether the output satisfies the predefined syntax (`<vulnerability>TYPE</vulnerability>` and `<trace>ADDRESS</trace>`), stabilizing output formatting throughout training. The informationally dominant component is $R_\text{graph}$, which works through the dual-stage progressive mechanism below.
+
+#### 5.1 Stage 1: Broad Graph-Pattern Exploration (soft reward)
+
+Early training is governed by an **embedding-similarity reward** designed to encourage broad coverage of the graph-topology space rather than premature specialization. The observed snapshot $G_\text{obs}$ and the reference graph $G^*$ are both projected into $\mathbb{R}^{256}$ by a heterogeneous graph encoder $\Phi$, and their cosine similarity is taken:
+
+$$r_\text{general} = \max\!\left(0,\ \frac{\mathbf{z}_\text{obs} \cdot \mathbf{z}^*}{\lVert \mathbf{z}_\text{obs}\rVert\, \lVert \mathbf{z}^*\rVert}\right) - 0.5 \ \in\ [-0.5,\ +0.5]$$
+
+Partial reward for topological proximity drives the policy to explore structural variants (e.g., incomplete reentrancy cycles), deferring strict precision to Stage 2.
+
+#### 5.2 Stage 2: Exact Signature Verification (hard reward)
+
+As the policy matures, the reward switches to a strict binary criterion grounded in **subgraph isomorphism**. The VF2 algorithm determines whether the signature $G^*$ appears inside $G_\text{obs}$ under the label assignment (node = address category, edge = interaction semantics):
+
+$$r_\text{strict} = \begin{cases} 1 & \text{if } G^* \text{ is subgraph-isomorphic into } G_\text{obs} \\ 0 & \text{otherwise} \end{cases}$$
+
+The dichotomous signal removes partial-credit ambiguity and provides an unambiguous learning signal for exact pattern matching.
+
+#### 5.3 Curriculum Scheduling: Smooth Sigmoid Transition
+
+The two stages are blended through a continuous sigmoid schedule:
+
+$$R_\text{graph} = \sigma(t)\, r_\text{strict} + \bigl(1 - \sigma(t)\bigr)\, r_\text{general} + R_\text{collab} + R_\text{param}$$
+
+$$\sigma(t) = \bigl(1 + e^{-k(t - m)}\bigr)^{-1}$$
+
+with $k$ controlling transition steepness and $m$ the midpoint step. Unlike a step function, the sigmoid ramp avoids abrupt gradient perturbations at the curriculum boundary.
+
+#### 5.4 Two Auxiliary Terms
+
+- **Multi-graph collaboration bonus** $R_\text{collab} = +0.3$: awarded when corroborating **anomalies** are detected *simultaneously* across ≥ 2 graph views. The implementation runs a discriminative anomaly detector per view — FFG: a directed Ether cycle, or value attached in parallel to a truncated-ABI call; CaG: a re-entry `CALL` antiparallel to an Ether flow, a call with ABI argument length < 32 bytes, or an opcode-gated branch (`TIMESTAMP`-style causal chain); CCG: a miner-account deploy edge or a deploy hub — and pays the bonus only when at least two views fire (e.g., FFG fund cycle + CaG re-entry edge for reentrancy; CaG opcode gate + CCG miner hub for timestamp-dependence). Merely sharing edge views with the signature is not sufficient.
+- **Parameter error penalty** $R_\text{param} = -0.3$ (per misaligned numeric field): incentivizes the policy to attend to fine-grained numerical context beyond what topological matching captures.
+
+### 6. Heterogeneous Graph Encoder $\Phi$
+
+$\Phi$ is an extension of the Relational Graph Convolutional Network (**RGCN**) that encodes a graph into a 256-d vector; relations are the edge types, and node features are one-hot node types.
+
+- **Pre-training**: trained on an independent data split with a **graph-contrastive** objective. Positive pairs share the same vulnerability label; hard negatives are the top-$k$ nearest dissimilar-class graphs by cosine distance.
+- **Frozen**: after pre-training, $\Phi$ is **kept frozen** throughout GRPO. If $\Phi$ were updated jointly with the policy $\pi_\theta$, the cosine-similarity reward would become a moving target, amplifying gradient variance and introducing reward non-stationarity.
+
+### 7. Policy Optimization: GRPO
+
+The policy network $\pi_\theta$ is optimized with **Group Relative Policy Optimization (GRPO)**. For each query $q$, a group of $N$ candidate completions is sampled from the reference policy, and the objective is
+
+$$\mathcal{J}_\text{GRPO}(\theta) = \mathbb{E}\left[\frac{1}{N}\sum_{i=1}^{N}\frac{1}{|o_i|}\sum_{t=1}^{|o_i|} \min\!\bigl(\rho_{i,t} A_i,\ \text{clip}(\rho_{i,t}, 1-\varepsilon, 1+\varepsilon) A_i\bigr)\right]$$
+
+where the importance ratio is $\rho_{i,t} = \pi_\theta(o_{i,t}\mid q, o_{i,<t}) / \pi_{\theta_\text{old}}(o_{i,t}\mid q, o_{i,<t})$ and the group-normalized advantage is $A_i = (r_i - \bar{r}) / \text{std}(r)$.
+
+Key design choices:
+
+- **No SFT pretraining** — pure RL, following the R1-style paradigm;
+- **KL regularization omitted** — policy drift is implicitly constrained by the clip bound;
+- **Reward-collapse guard**: under GRPO, the binary $r_\text{strict}$ can produce *degenerate batches* where all $N$ group samples receive the same reward, yielding zero group-normalized advantage and a vacuous gradient. In that case the gradient from $R_\text{format}$, $R_\text{collab}$, and $R_\text{param}$ (which remain non-constant within the group) is retained, ensuring a non-trivial learning signal.
+
+### 8. Output Format and Vulnerability Classes
+
+The policy must emit markup conforming to the following schema:
+
+```
+<vulnerability>TYPE</vulnerability>
+<trace>ADDRESS</trace>
+```
+
+- `TYPE` in { `reentrancy`, `short_address`, `timestamp`, `none` }
+- `ADDRESS` is a `0x`-prefixed 40-hex-digit address (the attacker-traceability result)
+- For a **benign verdict** (`none`) the `<trace>` tag must be **omitted** — there is no attacker to report; the sample then receives the format reward only, since no reference signature $G^*$ exists for the benign class
+
+The predicted vulnerability type selects which reference signature $G^*$ the sample is scored against — this is the mechanism that anchors the textual prediction in graph structure.
+
+### 9. Notation
+
+| Symbol | Meaning |
+|---|---|
+| $G_\text{obs}$ | unified observed snapshot within a time window, $\{G_f, G_c, G_\text{call}\}$ |
+| $G^*$ | canonical reference attack signature of a vulnerability class |
+| $\Phi$ | heterogeneous graph encoder (RGCN extension), graph -> $\mathbb{R}^{256}$ |
+| $\mathbf{z}_\text{obs}, \mathbf{z}^*$ | graph-level embeddings of $G_\text{obs}$ and $G^*$ |
+| $\sigma(t)$ | curriculum sigmoid, interpolating between the two stages over training step $t$ |
+| $\pi_\theta$ | the policy network being optimized |
+| $N$ | number of candidate completions per query in GRPO |
+
+### In One Sentence
+
+> Decompose an on-chain trace into three complementary graphs (fund-flow / creation / call), and use a sigmoid-curriculum reward that first explores broadly via graph-embedding cosine similarity and then verifies strictly via VF2 subgraph isomorphism, to train an LLM with pure RL (GRPO, no SFT, no KL) so that it both generalizes across structurally heterogeneous attack patterns and precisely classifies vulnerabilities while tracing the attacker.
+
+---
 
 ## Citation
 
-If you use this code, please cite the original paper:
+If you use DG-VDT, the datasets, or the code in this repository, please cite the accompanying manuscript:
 
 ```bibtex
-@article{zhang2026tsrdistill,
-  author  = {Zhang, Sibo and Yuan, Zichen and Chen, Kaijie},
-  title   = {Temporal, Structural, and Routed Distillation
-             ({TSR-Distill}): Domain-Specific Cross-Modal Knowledge
-             Transfer},
-  journal = {PeerJ Computer Science},
+@article{sun2026dgvdt,
+  title   = {DG-VDT: Dynamic Graph-Guided Reinforcement Learning for Low-Latency Vulnerability Detection and Attack Traceability in Ethereum Smart Contracts},
+  author  = {Sun, Shiman and Jiang, Wenbao},
+  journal = {Applied Sciences},
+  publisher = {MDPI},
   year    = {2026},
   note    = {Under review}
 }
 ```
 
+Please also cite the Zenodo archive of this code repository:
+
+```bibtex
+@dataset{sun2026dgvdt_zenodo,
+  title     = {DG-VDT: Reference implementation of the reward engine for dynamic graph-guided RL vulnerability detection and attack traceability},
+  author    = {Sun, Shiman and Jiang, Wenbao},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.20848392},
+  url       = {https://doi.org/10.5281/zenodo.20848392}
+}
+```
+
+---
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+- **Source code**: MIT License
+- **Author-constructed datasets and pre-trained model weights** (via Zenodo): CC BY 4.0
+- **Third-party datasets** (SolidiFI-Bench, SmartBugs Curated, SmartBugs Wild): governed by their original licenses; not redistributed here
+
+---
+
+## Contact
+
+For questions about the code or datasets, please contact the corresponding author:
+
+**Wenbao Jiang** — School of Computer Science, Beijing Information Science & Technology University, No.55 Taihe Road, Changping District, Beijing 102206, China
+Email: 2024021073@bistu.edu.cn
